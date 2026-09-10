@@ -4,16 +4,30 @@ from datetime import datetime, timezone
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .routers import profiles
+from .routers import alerts, incidents, profiles
 
 logger = logging.getLogger("mini_soc")
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(title="mini-soc-backend", version="0.1.0")
 
+# CORS abierto: esto es un backend de desarrollo local (localhost:8080) al que
+# le pega un dashboard corriendo en el navegador. No hay cookies de sesión
+# involucradas (la auth es un Bearer token explícito), así que un origen
+# abierto es razonable aquí. Para producción, restringir a los dominios reales.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(profiles.router)
+app.include_router(incidents.router)
+app.include_router(alerts.router)
 
 
 @app.get("/actuator/health")

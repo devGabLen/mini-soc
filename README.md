@@ -1,8 +1,4 @@
-# mini-soc
-
-CiberSecurity monitoring app
-
-Backend Python / FastAPI.
+# mini-soc-backend (Python / FastAPI)
 
 Reemplazo del backend Java: misma arquitectura, mismo Supabase, sin ningún
 cambio en `sql/01_schema_ddl.sql` ni `sql/02_security_rls.sql` — el diseño

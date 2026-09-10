@@ -12,13 +12,20 @@ class Settings(BaseSettings):
     obligatoria (sin valor por defecto).
     """
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
 
-    db_host: str = "db.relglfpyctcldlbgsjdn.supabase.co"
-    db_port: int = 5432
-    db_name: str = "postgresql"
-    db_user: str = "app_backend"
-    db_password: str = "j3mF2UOx3ihzzCEqy27jCRLVVS1O7sxl"
+    # Conexión vía Supavisor (connection pooler) en vez de la conexión directa:
+    # db.<ref>.supabase.co suele resolver solo a IPv6, y muchas redes/VMs
+    # (como la tuya) no tienen salida IPv6 -> "Network is unreachable".
+    # El pooler sí es accesible por IPv4. Puerto 6543 = modo transacción,
+    # que encaja con nuestro patrón de "una transacción corta por request".
+    db_host: str = "aws-0-us-east-1.pooler.supabase.com"
+    db_port: int = 6543
+    db_name: str = "postgres"
+    db_user: str = "app_backend.relglfpyctcldlbgsjdn"
+    db_password: str
 
     # Este proyecto de Supabase firma sus JWT con ES256 (asimétrico) -
     # confirmado inspeccionando un token real emitido por /auth/v1/token.

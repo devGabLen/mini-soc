@@ -27,7 +27,15 @@ conninfo = (
     f"password={settings.db_password}"
 )
 
-pool = ConnectionPool(conninfo, min_size=1, max_size=10, open=True)
+pool = ConnectionPool(
+    conninfo,
+    min_size=1,
+    max_size=10,
+    open=True,
+    kwargs={"prepare_threshold": None},  # ver ingest/tshark_ingest.py: incompatibilidad
+    # conocida entre prepared statements de psycopg y el pooler de Supabase en modo
+    # transacción (puerto 6543) -> DuplicatePreparedStatement bajo uso repetido.
+)
 
 
 def get_db_conn(current_user: CurrentUser = Depends(get_current_user)):
