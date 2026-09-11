@@ -4,9 +4,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-# --- profiles ---------------------------------------------------------------
-
-
 UserRole = Literal["admin", "soc_manager", "analyst_tier2", "analyst_tier1", "viewer"]
 
 
@@ -22,8 +19,6 @@ class ProfileResponse(BaseModel):
     created_at: datetime
 
 
-# --- incidents ---------------------------------------------------------------
-
 TlpLevel = Literal["RED", "AMBER_STRICT", "AMBER", "GREEN", "CLEAR"]
 PapLevel = Literal["RED", "AMBER", "GREEN", "WHITE"]
 
@@ -38,7 +33,6 @@ class IncidentCreateRequest(BaseModel):
 
 
 class IncidentUpdateRequest(BaseModel):
-    # Todos opcionales: PATCH parcial. Solo se actualizan los campos enviados.
     status: Optional[
         Literal["open", "in_progress", "contained", "closed", "false_positive"]
     ] = None
@@ -60,8 +54,6 @@ class IncidentResponse(BaseModel):
     acknowledged_at: Optional[datetime] = None
     closed_at: Optional[datetime] = None
 
-
-# --- alerts --------------------------------------------------------------
 
 MitreCategory = Literal[
     "reconocimiento",

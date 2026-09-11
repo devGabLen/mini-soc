@@ -1,12 +1,3 @@
-"""
-alerts es de solo lectura + creación desde la API. A propósito no hay
-PATCH/DELETE: ni siquiera existen políticas RLS para esas operaciones sobre
-esta tabla (ver sql/02_security_rls.sql) — es inmutabilidad forense, no un
-descuido. Si algún día hace falta "corregir" una alerta, eso se modela como
-un nuevo registro/comentario en incidents, no como editar la evidencia
-original.
-"""
-
 from typing import List
 
 import psycopg
@@ -15,6 +6,7 @@ from psycopg import Connection
 from psycopg.rows import dict_row
 
 from ..database import get_db_conn
+from ..geoip import geolocate
 from ..schemas import AlertCreateRequest, AlertResponse
 
 router = APIRouter(prefix="/api/v1/alerts", tags=["alerts"])
@@ -94,12 +86,29 @@ def create_alert(
     return _row_to_response(row)
 
 
+@router.get("/geo", response_model=List[dict])
+def get_alert_origins_geo(conn: Connection = Depends(get_db_conn)) -> List[dict]:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            select host(src_ip) as src_ip, count(*) as cantidad, max(severity) as severidad_max
+            from public.alerts
+            group by src_ip
+            order by cantidad desc
+            """
+        )
+        rows = cur.fetchall()
+
+    results = []
+    for src_ip, cantidad, severidad_max in rows:
+        geo = geolocate(src_ip)
+        results.append({**geo, "count": cantidad, "max_severity": severidad_max})
+
+    return results
+
+
 @router.get("/mttd", response_model=dict)
 def get_mttd(conn: Connection = Depends(get_db_conn)) -> dict:
-    """
-    MTTD promedio (en segundos) sobre las alertas visibles para este usuario,
-    tal como se explicó en docs/ARQUITECTURA_FASE1.md.
-    """
     with conn.cursor() as cur:
         cur.execute(
             """

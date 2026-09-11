@@ -14,9 +14,6 @@ def get_my_profile(
     current_user: CurrentUser = Depends(get_current_user),
     conn: Connection = Depends(get_db_conn),
 ) -> ProfileResponse:
-    # Filtro explícito por user_id: RLS ya restringe qué filas son visibles,
-    # pero un admin ve TODOS los perfiles por política, así que sin este
-    # WHERE un admin podría recibir el perfil de otra persona en su /me.
     row = conn.execute(
         """
         select id, email, full_name, role, created_at
@@ -44,12 +41,6 @@ def update_profile_role(
     body: RoleUpdateRequest,
     conn: Connection = Depends(get_db_conn),
 ) -> ProfileResponse:
-    """
-    Cambia el rol de OTRO usuario. No hay ninguna validación de "eres admin"
-    aquí en Python: la política profiles_update_any_by_admin y el trigger
-    private.prevent_role_escalation ya lo garantizan en Postgres. Si quien
-    llama no es admin, esto simplemente no afecta ninguna fila.
-    """
     try:
         row = conn.execute(
             """
@@ -61,8 +52,6 @@ def update_profile_role(
             (body.role, profile_id),
         ).fetchone()
     except psycopg.errors.RaiseException as exc:
-        # El trigger prevent_role_escalation lanza esta excepción cuando
-        # quien llama no es admin pero de alguna forma la fila sí era visible.
         raise HTTPException(
             status_code=403,
             detail="No tienes permisos para modificar el rol de este usuario.",

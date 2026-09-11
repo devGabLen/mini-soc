@@ -1,28 +1,4 @@
 #!/usr/bin/env python3
-"""
-Captura tráfico en vivo con tshark y lo inserta en public.network_logs,
-usando el rol dedicado `sensor_ingest` (solo puede INSERT en esa tabla,
-nada más - ver sql/06_sensor_ingest_role.sql).
-
-Este script NO usa el pool de la app (RlsConnectionAspect / auth.uid()):
-el sensor no tiene un usuario humano detrás, así que se conecta directo
-con sus propias credenciales, y la política RLS de network_logs para este
-rol es simplemente "siempre puede insertar" - la seguridad real está en
-que este rol no puede hacer NADA más que eso.
-
-Requisitos:
-- tshark instalado (Kali ya lo trae: `sudo apt install tshark` si falta).
-- Permisos para capturar en la interfaz: corre este script con `sudo`,
-  o dale la capability a dumpcap una sola vez:
-      sudo setcap cap_net_raw,cap_net_admin+eip $(which dumpcap)
-  y así no necesitas sudo cada vez.
-
-Uso:
-    python3 ingest/tshark_ingest.py --interface eth0
-    python3 ingest/tshark_ingest.py --interface wlan0
-
-Para ver tus interfaces disponibles: `tshark -D`
-"""
 
 import argparse
 import hashlib
@@ -47,9 +23,6 @@ if not DB_PASSWORD:
         "  export SENSOR_DB_PASSWORD='...'"
     )
 
-# Campos que le pedimos a tshark, en este orden. data.data trae el payload
-# en hexadecimal SI el paquete tiene datos de aplicación (muchos paquetes de
-# control, como ACKs puros, no traen nada ahí).
 TSHARK_FIELDS = [
     "frame.time_epoch",
     "ip.src",
@@ -68,18 +41,12 @@ def build_tshark_command(interface: str) -> list[str]:
 
 
 def compute_payload_hash(data_hex: str, fallback_seed: str) -> str:
-    """
-    Si el paquete trae payload de aplicación, hasheamos eso (huella real del
-    contenido). Si no (ej. un ACK puro de TCP), usamos un hash de metadatos
-    como identificador estable - documentado así para que quede claro que
-    NO es un hash del contenido real cuando no lo hay.
-    """
     raw = data_hex if data_hex else fallback_seed
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser()
     parser.add_argument(
         "--interface", required=True, help="Interfaz a capturar (ver `tshark -D`)"
     )
@@ -108,8 +75,6 @@ def main() -> None:
                     data_hex = parts[5] if len(parts) > 5 else ""
 
                     if not src_ip or not dst_ip:
-                        # Frames sin IP (ARP, etc.) - fuera del alcance de
-                        # network_logs, que está diseñada para tráfico IP.
                         continue
 
                     try:

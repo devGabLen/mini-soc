@@ -1,26 +1,4 @@
 #!/usr/bin/env python3
-"""
-Motor de correlación (versión 1: detector de escaneo de puertos).
-
-Lee las filas nuevas de network_logs (desde el último checkpoint guardado en
-private.correlation_runs), agrupa por (src_ip, dst_ip), y si una IP generó
-muchas conexiones TCP en una ventana de tiempo muy corta, genera una alerta
-en public.alerts.
-
-Se conecta como el rol `correlation_engine` (ver sql/07_correlation_engine_role.sql),
-que SOLO puede leer network_logs, leer/insertar alerts, y leer/actualizar su
-propio checkpoint - nada más.
-
-LIMITACIÓN CONOCIDA (documentada a propósito, no es un descuido): al avanzar
-el checkpoint en cada corrida, un escaneo lento que cruce el límite entre dos
-corridas podría quedar dividido en dos grupos que individualmente no lleguen
-al umbral, y pasar desapercibido. Un motor de correlación real usa ventanas
-deslizantes que se solapan; esta versión usa ventanas fijas por simplicidad.
-
-Uso:
-    python3 correlate/port_scan_detector.py                  # corre una vez
-    python3 correlate/port_scan_detector.py --loop --interval 10   # cada 10s
-"""
 
 import argparse
 import os
@@ -38,12 +16,9 @@ DB_NAME = os.environ.get("DB_NAME", "postgres")
 DB_USER = os.environ.get("CORRELATION_DB_USER", "correlation_engine.relglfpyctcldlbgsjdn")
 DB_PASSWORD = os.environ.get("CORRELATION_DB_PASSWORD")
 
-# Umbral mínimo de conexiones para considerar "posible escaneo", y ventana de
-# tiempo máxima en la que deben ocurrir para contar como "ráfaga sospechosa".
 MIN_CONNECTIONS = 50
 MAX_WINDOW_SECONDS = 10
 
-# Severidad según qué tan agresivo fue el patrón.
 def severity_for(count: int) -> int:
     if count >= 400:
         return 4
@@ -70,8 +45,6 @@ def run_once(conn: psycopg.Connection) -> int:
         "select last_processed_at from private.correlation_runs where id = true"
     ).fetchone()[0]
 
-    # Grupos sospechosos: muchas conexiones TCP, misma (src_ip, dst_ip),
-    # en una ventana de tiempo corta, desde el último checkpoint.
     groups = conn.execute(
         """
         select src_ip, dst_ip, count(*) as cnt,
@@ -97,7 +70,7 @@ def run_once(conn: psycopg.Connection) -> int:
             """,
             (
                 "reconocimiento",
-                "TA0043",  # MITRE ATT&CK: Reconnaissance
+                "TA0043",
                 severity_for(cnt),
                 f"Posible escaneo de puertos: {cnt} conexiones TCP de {src_ip} "
                 f"hacia {dst_ip} en {(last_ts - first_ts).total_seconds():.2f}s",
@@ -109,8 +82,6 @@ def run_once(conn: psycopg.Connection) -> int:
         alerts_created += 1
         print(f"[ALERTA] {src_ip} -> {dst_ip}: {cnt} conexiones -> severidad {severity_for(cnt)}")
 
-    # Avanzar el checkpoint al timestamp más reciente visto en network_logs,
-    # sin importar si generó alerta o no - así nunca se re-analiza lo mismo.
     newest = conn.execute(
         'select max("timestamp") from public.network_logs where "timestamp" > %s',
         (checkpoint,),
@@ -126,7 +97,7 @@ def run_once(conn: psycopg.Connection) -> int:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser()
     parser.add_argument("--loop", action="store_true", help="Correr en bucle continuo")
     parser.add_argument("--interval", type=int, default=10, help="Segundos entre corridas (--loop)")
     args = parser.parse_args()

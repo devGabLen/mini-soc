@@ -14,10 +14,6 @@ logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(title="mini-soc-backend", version="0.1.0")
 
-# CORS abierto: esto es un backend de desarrollo local (localhost:8080) al que
-# le pega un dashboard corriendo en el navegador. No hay cookies de sesión
-# involucradas (la auth es un Bearer token explícito), así que un origen
-# abierto es razonable aquí. Para producción, restringir a los dominios reales.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -56,8 +52,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):
-    # Nunca se devuelve el mensaje crudo de la excepción ni un stack trace al
-    # cliente: solo un refId de correlación. El detalle real va al log interno.
     ref_id = str(uuid.uuid4())
     logger.exception("Error interno no controlado [ref=%s]", ref_id)
     return JSONResponse(

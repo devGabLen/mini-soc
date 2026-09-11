@@ -374,6 +374,7 @@ export default function SocDashboard() {
   const [alerts, setAlerts] = useState([]);
   const [mttd, setMttd] = useState(null);
   const [mttr, setMttr] = useState(null);
+  const [geoOrigins, setGeoOrigins] = useState([]);
   const [loadError, setLoadError] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -387,7 +388,7 @@ export default function SocDashboard() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [profRes, incRes, alertRes, mttdRes, mttrRes] = await Promise.all(
+      const [profRes, incRes, alertRes, mttdRes, mttrRes, geoRes] = await Promise.all(
         [
           fetch(`${API_BASE}/api/v1/profiles/me`, { headers: authHeaders() }),
           fetch(`${API_BASE}/api/v1/incidents?limit=50`, {
@@ -400,6 +401,7 @@ export default function SocDashboard() {
           fetch(`${API_BASE}/api/v1/incidents/mttr`, {
             headers: authHeaders(),
           }),
+          fetch(`${API_BASE}/api/v1/alerts/geo`, { headers: authHeaders() }),
         ]
       );
 
@@ -414,12 +416,14 @@ export default function SocDashboard() {
       const alr = alertRes.ok ? await alertRes.json() : [];
       const mttdData = mttdRes.ok ? await mttdRes.json() : {};
       const mttrData = mttrRes.ok ? await mttrRes.json() : {};
+      const geoData = geoRes.ok ? await geoRes.json() : [];
 
       setProfile(prof);
       setIncidents(inc);
       setAlerts(alr);
       setMttd(mttdData.mttd_seconds);
       setMttr(mttrData.mttr_seconds);
+      setGeoOrigins(geoData);
     } catch (err) {
       setLoadError(err.message || "No se pudo conectar con el backend.");
     } finally {
@@ -486,7 +490,6 @@ export default function SocDashboard() {
         </div>
       )}
 
-      {/* Stats strip */}
       <div style={{ display: "flex", borderBottom: "1px solid #232838" }}>
         <div style={styles.statBlock}>
           <div style={styles.statLabel}>MTTD promedio</div>
@@ -517,7 +520,6 @@ export default function SocDashboard() {
         </div>
       </div>
 
-      {/* Main grid */}
       <div
         style={{
           display: "grid",
@@ -526,7 +528,6 @@ export default function SocDashboard() {
           padding: "16px 24px",
         }}
       >
-        {/* Incidents panel */}
         <div style={styles.panel}>
           <div style={styles.panelTitle}>INCIDENTES ({incidents.length})</div>
           <div style={{ maxHeight: "320px", overflowY: "auto" }}>
@@ -568,7 +569,6 @@ export default function SocDashboard() {
           <NewIncidentForm token={token} onCreated={loadAll} />
         </div>
 
-        {/* Charts panel */}
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           <div style={styles.panel}>
             <div style={styles.panelTitle}>ALERTAS POR SEVERIDAD</div>
@@ -648,7 +648,62 @@ export default function SocDashboard() {
         </div>
       </div>
 
-      {/* Alerts feed */}
+      <div style={{ padding: "0 24px 16px" }}>
+        <div style={styles.panel}>
+          <div style={styles.panelTitle}>
+            ORIGEN GEOGRÁFICO DE LAS AMENAZAS
+          </div>
+          <div style={{ padding: "12px 14px" }}>
+            {geoOrigins.length === 0 ? (
+              <div style={styles.statLabel}>Sin datos de origen todavía.</div>
+            ) : (
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>IP origen</th>
+                    <th style={styles.th}>Ubicación</th>
+                    <th style={styles.th}>Alertas</th>
+                    <th style={styles.th}>Sev. máx</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {geoOrigins.map((g) => (
+                    <tr key={g.ip}>
+                      <td style={{ ...styles.td, ...styles.mono }}>{g.ip}</td>
+                      <td style={styles.td}>
+                        {g.geolocatable ? (
+                          <span>
+                            {g.city ? `${g.city}, ` : ""}
+                            {g.country}{" "}
+                            <span style={{ ...styles.mono, color: "#5B6373", fontSize: "11px" }}>
+                              ({g.lat?.toFixed(2)}, {g.lon?.toFixed(2)})
+                            </span>
+                          </span>
+                        ) : (
+                          <span style={{ color: "#5B6373", fontStyle: "italic" }}>
+                            {g.reason}
+                          </span>
+                        )}
+                      </td>
+                      <td style={styles.td}>{g.count}</td>
+                      <td style={styles.td}>
+                        <span style={styles.badge(SEVERITY_COLOR[g.max_severity])} />
+                        {g.max_severity}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            <div style={{ ...styles.brandSub, marginTop: "10px" }}>
+              Nota: las IPs de red privada (192.168.x.x, 10.x.x.x) o de rangos
+              reservados para documentación no tienen ubicación geográfica
+              real — se muestran así en vez de inventar una.
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div style={{ padding: "0 24px 24px" }}>
         <div style={styles.panel}>
           <div style={styles.panelTitle}>ALERTAS RECIENTES ({alerts.length})</div>

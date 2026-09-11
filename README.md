@@ -17,11 +17,22 @@ pip install -r requirements.txt
 Los defaults en `app/config.py` ya apuntan a tu proyecto Supabase real. Si
 quieres sobreescribirlos, copia `.env.example` a `.env` y edítalo.
 
-## Arrancar
+## Arrancar (local, con Python directo)
 
 ```bash
 uvicorn app.main:app --reload --port 8080
 ```
+
+## Arrancar (con Docker, recomendado para no depender de tu Python del sistema)
+
+```bash
+cp .env.example .env   # completa DB_PASSWORD con la contraseña real
+docker compose up --build
+```
+
+El backend queda disponible en `http://localhost:8080` igual que antes.
+Nota: `ingest/` y `correlate/` siguen corriendo fuera de Docker (necesitan
+acceso directo a la interfaz de red del host) - ver sus propios README.
 
 ## Probar
 

@@ -1,12 +1,3 @@
-"""
-Endpoints de incidents. Nótese lo que NO hace este archivo: no valida "¿puede
-este usuario ver/crear/editar este incidente?" en Python. Esa autorización
-fina ya la hace Postgres vía RLS (sql/02_security_rls.sql), usando la
-identidad que RlsConnectionAspect (database.get_db_conn) ya propagó. El
-backend solo traduce HTTP <-> SQL y decide qué código de estado devolver
-según lo que Postgres permitió o bloqueó.
-"""
-
 from typing import List
 from uuid import UUID
 
@@ -38,12 +29,6 @@ def _row_to_response(row: dict) -> IncidentResponse:
 
 @router.get("/mttr", response_model=dict)
 def get_mttr(conn: Connection = Depends(get_db_conn)) -> dict:
-    """
-    MTTR promedio (en segundos) y tiempo medio de reconocimiento, sobre los
-    incidentes CERRADOS visibles para este usuario (RLS filtra el resto).
-    Ver docs/ARQUITECTURA_FASE1.md para la explicación de por qué se separan
-    acknowledged_at (primera respuesta) de closed_at (resolución real).
-    """
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -68,8 +53,6 @@ def list_incidents(
     offset: int = Query(0, ge=0),
     conn: Connection = Depends(get_db_conn),
 ) -> List[IncidentResponse]:
-    # Sin WHERE: RLS ya filtra. Si el usuario no es SOC staff, esto
-    # simplemente devuelve una lista vacía, no un error.
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
             """
@@ -110,8 +93,6 @@ def create_incident(
             )
             row = cur.fetchone()
     except psycopg.errors.InsufficientPrivilege as exc:
-        # La política incidents_insert_soc_staff bloqueó el INSERT
-        # (el usuario autenticado no es analyst/manager/admin).
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para crear incidentes.",
@@ -147,9 +128,6 @@ def update_incident(
         row = cur.fetchone()
 
     if row is None:
-        # RLS bloqueó la fila (no es tu incidente asignado ni eres manager/admin)
-        # O el incidente no existe. Por diseño, no se distingue entre ambos casos
-        # aquí para no filtrar información sobre qué incidentes existen.
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Incidente no encontrado o sin permisos para modificarlo.",
@@ -165,8 +143,6 @@ def delete_incident(incident_id: UUID, conn: Connection = Depends(get_db_conn)) 
         deleted = cur.fetchone()
 
     if deleted is None:
-        # Igual que en update: RLS solo deja borrar a un admin (política
-        # incidents_delete_admin_only). 0 filas = no existe o no tienes permiso.
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Incidente no encontrado o sin permisos para eliminarlo.",

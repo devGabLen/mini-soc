@@ -1,11 +1,3 @@
-"""
-Equivalente Python de SecurityConfig.java + SupabaseJwtAuthConverter.java.
-
-Valida la firma del JWT contra el endpoint JWKS público del proyecto (ES256),
-sin necesidad de compartir ningún secreto. PyJWKClient cachea las claves
-públicas automáticamente, evitando pegarle al endpoint JWKS en cada request.
-"""
-
 from typing import Optional
 
 import jwt
@@ -20,9 +12,9 @@ _jwk_client = jwt.PyJWKClient(settings.supabase_jwks_uri)
 
 
 class CurrentUser(BaseModel):
-    sub: str  # uuid del usuario, coincide con auth.uid() en Postgres
+    sub: str
     email: Optional[str] = None
-    soc_role: Optional[str] = None  # profiles.role, sincronizado en app_metadata
+    soc_role: Optional[str] = None
 
 
 def get_current_user(
